@@ -1,12 +1,4 @@
-﻿<#
-  ONYX STRINGS v0.2.0 - Minecraft (javaw) memory string analyzer
-  Read-only: opens the process with PROCESS_QUERY_INFORMATION | PROCESS_VM_READ only.
-  Findings are INDICATORS, not verdicts.
 
-  Run:  powershell -ExecutionPolicy Bypass -File .\Onyx_Strings.ps1
-  Opts: -ProcessId 1234  -MinLength 5  -Detail  -Samples 2  -KeywordFile .\my.txt  -DumpStrings  -NoPause
-  Keyword file lines:  Severity|Category|word1;word2;word3     (Severity 3=HIGH 2=MED 1=LOW)
-#>
 [CmdletBinding()]
 param(
     [int]$ProcessId = 0,
@@ -304,7 +296,6 @@ function Show-Banner {
     W ('─' * 78) 'DarkCyan'
 }
 
-# ---------------------------------------------------------------- process discovery
 function Get-Candidates {
     $procs = @(Get-CimInstance Win32_Process -Filter "Name='javaw.exe' OR Name='java.exe'" -ErrorAction SilentlyContinue)
     $out = foreach ($p in $procs) {
@@ -340,7 +331,6 @@ function Get-JvmFindings { param([string]$Cmd)
     return $r
 }
 
-# ---------------------------------------------------------------- main
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 $kwTable = Get-KeywordTable
 $sevMeta = @{

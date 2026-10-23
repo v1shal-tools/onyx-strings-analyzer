@@ -1,4 +1,3 @@
-
 [CmdletBinding()]
 param(
     [int]$ProcessId = 0,
@@ -53,7 +52,7 @@ public static class OnyxScan {
     public static int HitCount;
     public static string Error;
 
-    const int CH = 16 * 1024 * 1024;
+    const int CH = 1024 * 1024;
     const int MAXRUN = 2048;
     static char[] run = new char[MAXRUN];
     static int[][] go; static List<int>[] outp; static string[] kw, cat; static int[] sev, klen;
@@ -145,7 +144,24 @@ public static class OnyxScan {
                     int want = (int)Math.Min((ulong)CH, rg[1] - off);
                     UIntPtr rd;
                     if (!ReadProcessMemory(h, (IntPtr)(long)(rg[0] + off), buf, (UIntPtr)want, out rd) || rd == UIntPtr.Zero) {
-                        off += (ulong)want; DoneBytes += want; continue;
+                        // Retry failed reads in smaller blocks so one unreadable page does not hide an entire region chunk.
+                        ulong sub = 0;
+                        const int SMALL = 64 * 1024;
+                        while (sub < (ulong)want) {
+                            int smallWant = (int)Math.Min((ulong)SMALL, (ulong)want - sub);
+                            UIntPtr smallRead;
+                            if (ReadProcessMemory(h, (IntPtr)(long)(rg[0] + off + sub), buf, (UIntPtr)smallWant, out smallRead) && smallRead != UIntPtr.Zero) {
+                                int smallN = (int)(ulong)smallRead;
+                                ScanAscii(buf, smallN, rg[0] + off + sub);
+                                ScanWide(buf, smallN, rg[0] + off + sub);
+                                sub += (ulong)smallN;
+                            } else {
+                                sub += (ulong)smallWant;
+                            }
+                        }
+                        off += (ulong)want;
+                        DoneBytes += want;
+                        continue;
                     }
                     int n = (int)(ulong)rd;
                     ScanAscii(buf, n, rg[0] + off);
@@ -285,7 +301,7 @@ function Show-Banner {
     for ($i = 0; $i -lt $rows.Count; $i++) { W ('        ' + $rows[$i]) $colors[$i] }
     W ''
     W '        M E M O R Y   S T R I N G   A N A L Y Z E R' 'Cyan'
-    W '        v0.2.0  •  read-only  •  indicators, not verdicts' 'DarkGray'
+    W '        v0.3.0  •  READ-ONLY MEMORY SCAN' 'DarkGray'
     W ''
     W ('─' * 78) 'DarkCyan'
 }
@@ -431,7 +447,7 @@ do {
     W ('╚' + ('═' * ($w - 2)) + '╝') 'DarkGray'
     W ''
     if ($findings.Count -eq 0) {
-        W '  ✓ No keyword indicators in readable javaw memory.' 'Green'
+        W '  ✓ No configured keyword indicators found in readable process memory.' 'Green'
         W '    (No match is not proof of clean: strings can be encrypted or built at runtime.)' 'DarkGray'
     }
     foreach ($f in @($findings | Where-Object { $_.Sev -ge 2 })) {
@@ -478,7 +494,7 @@ do {
     foreach ($j in $jvm) { W ('  ◉ {0}  {1}' -f $j.T, $j.D) 'Yellow' }
     W ''
     W ('━' * ($w - 1)) 'DarkCyan'
-    W '  Indicators, not proof. Legit mods/anticheat/chat can contain these strings.' 'DarkGray'
+    W '  Findings are indicators. Review context before making a decision.' 'DarkGray'
     if ($dumpPath) { W ('  Strings dump: ' + $dumpPath) 'DarkGray' }
 
     if (-not $NoPause) {

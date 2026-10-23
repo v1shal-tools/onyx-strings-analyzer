@@ -18,8 +18,6 @@ if (-not [Environment]::Is64BitProcess) {
     Write-Host "Run this in 64-bit PowerShell (not the x86 one)." -ForegroundColor Red
     return
 }
-
-# ---------------------------------------------------------------- native scanner
 if (-not ('OnyxScan' -as [type])) {
 Add-Type -TypeDefinition @'
 using System;
@@ -224,8 +222,6 @@ public static class OnyxScan {
 }
 '@
 }
-
-# ---------------------------------------------------------------- keyword database
 $DefaultKeywords = @'
 3|Known client|vape.gg;vapeclient;vapelite;liquidbounce;rusherhack;konas;futureclient;impactclient;aristois;novoline;pandaware;riseclient;rise.today;doomsdayclient;doomsday.jar;novaclient;dqrkis;catleanclient;prestigeclient;xenonclient;asteriaclient;gypsyclient;argonclient;virginclient;grimclient;fdp-client;intent.store;skid.krypton;skid/krypton;dev.krypton;dev/krypton
 2|Known client|meteordevelopment;meteorclient;meteor-client
@@ -263,8 +259,6 @@ function Get-KeywordTable {
         Sevs  = [int[]]($words | ForEach-Object { $map[$_].Sev })
     }
 }
-
-# ---------------------------------------------------------------- ui helpers
 function W { param([string]$T = '', [ConsoleColor]$C = 'Gray', [switch]$NoNewline)
     if ($NoNewline) { Write-Host $T -ForegroundColor $C -NoNewline } else { Write-Host $T -ForegroundColor $C } }
 function Bar { param([double]$V, [double]$M, [int]$Width)
@@ -404,8 +398,6 @@ do {
     $sw.Stop()
 
     if ([OnyxScan]::Error) { W ('  ✗ ' + [OnyxScan]::Error) 'Red'; break }
-
-    # ---- findings: merge spacing variants (hover totem / hovertotem), drop keywords nested in a longer hit
     $raw = @([OnyxScan]::GetHits() | ForEach-Object {
             [pscustomobject]@{
                 Keyword = $_.Keyword; Category = $_.Category; Sev = [int]$_.Severity; Count = [long]$_.Count
@@ -432,16 +424,12 @@ do {
     $grade = if ($score -ge 90) { 'A' } elseif ($score -ge 75) { 'B' } elseif ($score -ge 60) { 'C' } elseif ($score -ge 40) { 'D' } else { 'F' }
     $risk = if ($hi -ge 3) { 'CRITICAL' } elseif ($hi -ge 1) { 'HIGH' } elseif ($me -ge 1) { 'REVIEW' } else { 'NO INDICATORS' }
     $riskC = switch ($risk) { 'CRITICAL' { 'Red' } 'HIGH' { 'Red' } 'REVIEW' { 'Yellow' } default { 'Green' } }
-
-    # ---- summary
     W ('╔' + ('═' * ($w - 2)) + '╗') 'DarkGray'
     Box-Line ('{0}  {1}/100  GRADE {2}   RISK {3}' -f (Bar $score 100 20), $score, $grade, $risk) $riskC
     Box-Line ('HIGH {0}    MED {1}    LOW {2}' -f $hi, $me, $lo) 'Gray'
     Box-Line ('{0:N0} strings  •  {1}  •  {2:N1}s' -f [OnyxScan]::StringsSeen, (Fmt-Bytes ([OnyxScan]::DoneBytes)), $sw.Elapsed.TotalSeconds) 'DarkGray'
     W ('╚' + ('═' * ($w - 2)) + '╝') 'DarkGray'
     W ''
-
-    # ---- findings: one line each (HIGH + MED), LOW collapsed
     if ($findings.Count -eq 0) {
         W '  ✓ No keyword indicators in readable javaw memory.' 'Green'
         W '    (No match is not proof of clean: strings can be encrypted or built at runtime.)' 'DarkGray'
@@ -470,8 +458,6 @@ do {
             else { W ('        ' + $l) 'DarkGray' }
         }
     }
-
-    # ---- origin hints: package prefixes seen in the matching strings
     $origin = @{}
     foreach ($f in $findings) {
         foreach ($s in $f.Samples) {
@@ -487,8 +473,6 @@ do {
         W '  Origin hint  ' 'Cyan' -NoNewline; W ($top -join ', ') 'White'
         W '  (package seen in the matching strings; find which jar owns it)' 'DarkGray'
     }
-
-    # ---- JVM
     W ''
     if ($jvm.Count -eq 0) { W '  ✓ JVM: no unrecognized agent or risky flags' 'Green' }
     foreach ($j in $jvm) { W ('  ◉ {0}  {1}' -f $j.T, $j.D) 'Yellow' }
